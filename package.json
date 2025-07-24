@@ -1,0 +1,11 @@
+{
+  "name": "node-beanstalk-sample",
+  "version": "1.0.0",
+  "description": "Simple Node.js app for AWS CodePipeline + Beanstalk",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}
