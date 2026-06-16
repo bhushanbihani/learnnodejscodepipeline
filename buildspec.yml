@@ -3,9 +3,48 @@ version: 0.2
 phases:
   build:
     commands:
-      - echo "Starting build"
+      - echo "Installing dependencies"
       - npm install
+      - echo "Installing Sonar Scanner"
       - npm install -g sonarqube-scanner
+      - echo "Running Sonar Scan"
       - sonar-scanner
-      - echo "Sending SES email"
-      - aws ses send-email --from "$SES_FROM" --destination "ToAddresses=$SES_TO" --message '{"Subject":{"Data":"SES Test Email"},"Body":{"Text":{"Data":"Hello from AWS CodeBuild"}}}'
+      - echo "Getting Quality Gate Status"
+      - |
+        QUALITY_STATUS=$(curl -s \
+        -u ${SONAR_TOKEN}: \
+        "https://sonarcloud.io/api/qualitygates/project_status?projectKey=${SONAR_PROJECT_KEY}" \
+        | jq -r '.projectStatus.status')
+
+        echo "Quality Gate=${QUALITY_STATUS}"
+
+        SONAR_METRICS=$(curl -s \
+        -u ${SONAR_TOKEN}: \
+        "https://sonarcloud.io/api/measures/component?component=${SONAR_PROJECT_KEY}&metricKeys=bugs,vulnerabilities,code_smells,coverage")
+
+        BUGS=$(echo $SONAR_METRICS | jq -r '.component.measures[] | select(.metric=="bugs") | .value')
+
+        VULNERABILITIES=$(echo $SONAR_METRICS | jq -r '.component.measures[] | select(.metric=="vulnerabilities") | .value')
+
+        CODE_SMELLS=$(echo $SONAR_METRICS | jq -r '.component.measures[] | select(.metric=="code_smells") | .value')
+
+        COVERAGE=$(echo $SONAR_METRICS | jq -r '.component.measures[] | select(.metric=="coverage") | .value')
+
+        aws ses send-email \
+        --region ap-southeast-1 \
+        --from "$SES_FROM" \
+        --destination "ToAddresses=$SES_TO" \
+        --message "{
+          \"Subject\": {
+            \"Data\": \"SonarCloud Analysis Report\"
+          },
+          \"Body\": {
+            \"Text\": {
+              \"Data\": \"Project: ${SONAR_PROJECT_KEY}\nQuality Gate: ${QUALITY_STATUS}\nBugs: ${BUGS}\nVulnerabilities: ${VULNERABILITIES}\nCode Smells: ${CODE_SMELLS}\nCoverage: ${COVERAGE}%\nDashboard: https://sonarcloud.io/project/overview?id=${SONAR_PROJECT_KEY}\"
+            }
+          }
+        }"
+
+artifacts:
+  files:
+    - '**/*'
