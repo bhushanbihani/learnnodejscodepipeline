@@ -1,18 +1,12 @@
 version: 0.2
 
 phases:
-install:
-runtime-versions:
-nodejs: 20
-commands:
-- npm install
-- npm install -g sonarqube-scanner
-
 build:
 commands:
+- echo "Starting build"
+- npm install
+- npm install -g sonarqube-scanner
 - npm run build
 - sonar-scanner
-
-artifacts:
-files:
-- '**/*'
+- echo "Sending SES email"
+- aws ses send-email --from "$SES_FROM" --destination "ToAddresses=$SES_TO" --message '{"Subject":{"Data":"SES Test Email"},"Body":{"Text":{"Data":"Hello from AWS CodeBuild"}}}'
